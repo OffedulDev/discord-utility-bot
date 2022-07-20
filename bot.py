@@ -1,4 +1,10 @@
+from copy import copy
+from distutils.command.build import build
+from email.policy import default
 import json
+from pydoc import describe
+from unittest import addModuleCleanup
+from xmlrpc.client import Server
 from click import option
 import interactions
 class colors:
@@ -34,10 +40,35 @@ class Embeds:
     ServerBanEmbed = interactions.Embed(title="✅ Utente Bannato", description="Hai bannato l'utente con successo, seguano i dettagli dell'azione.", color=colors.green)
     KickEmbed = interactions.Embed(title="⚠️ Sei stato Espulso. ⚠️", description="Sei stato espulso da Diamond City, seguano i dettagi del tuo ban.", color=colors.red)
     ServerKickEmbed = interactions.Embed(title="✅ Utente Espulso", description="Hai espulso l'utente con successo, seguano i dettagli dell'azione.", color=colors.green)
+    WarnEmbed = interactions.Embed(title="🪖 Sei stato avvertito! 🪖", description="Sei stato avvertito, seguano i dettagli del tuo avvertimento.", color=colors.orange)
+    ServerWarnEmbed = interactions.Embed(title="✅ Utente Avvertito", description="Hai avvertito l'utente con successo, seguano i dettagli dell'azione.", color=colors.green)
 
-#TODO: ADD PERMISSIONS TO COMMANDS  
+# JSON Functions
+async def build_user_data(user_id):
+
+    user_data = {
+        "warn_amount": "0"
+    }
+    
+    return user_data
+
+async def read_json_value(value):
+    with open('data.json', "r+") as file:
+        Data = json.loads(file.read())
+        Data = Data["data"]
+        file.close()
+        return Data[value]
+        
+async def write_json_value(key, data):
+    with open('data.json', "r+") as file:
+        Data = json.loads(file.read())
+        Data["data"][key] = data
+
+        file.seek(0)
+        json.dump(Data, file, indent=4)  
+        file.close()  
+
 # Kick Command
-
 @Bot.command(
     name="kick",
     description="Espelli un utente dal server.",
@@ -49,26 +80,34 @@ class Embeds:
             required=True,
         ),
         interactions.Option(
-            name="motivo",
+            name="reason",
             description="Perchè stai espellendo questo utente?",
             type=interactions.OptionType.STRING,
             required=False,
         )
-    ]
+    ],
+    default_member_permissions=interactions.Permissions.KICK_MEMBERS
 )
-async def kick(ctx, user, motivo="Nessun motivo fornito."):
+async def kick(ctx, user, reason="Nessun reason fornito."):
     
     # Vars
     guild = await ctx.get_guild()
-    ClientKickEmbed = Embeds.KickEmbed
-    ServerKickEmbed = Embeds.ServerKickEmbed
+    
+    ClientKickEmbed = copy(Embeds.KickEmbed)
+    ServerKickEmbed = copy(Embeds.ServerKickEmbed)
 
     # Embed Settings
     ServerKickEmbed.add_field(name="👨 Utente: ", value=user.name, inline=False)
-    ServerKickEmbed.add_field(name="📒 Motivo: ", value=motivo, inline=False)
+    ServerKickEmbed.add_field(name="📒 Motivo: ", value=reason, inline=False)
     ClientKickEmbed.add_field(name="👮 Moderatore: ", value=ctx.author.name, inline=False)
-    ClientKickEmbed.add_field(name="📒 Motivo: ", value=motivo, inline=False)
+    ClientKickEmbed.add_field(name="📒 Motivo: ", value=reason, inline=False)
 
+    # Actions
+    await user.send(embeds=ClientKickEmbed)
+    await ctx.send(embeds=ServerKickEmbed, ephemeral=True)
+    await user.kick(guild.id, reason)
+
+# Ban Command
 @Bot.command(
     name="ban",
     description="Bandisci un utente dal server in questione.",
@@ -80,30 +119,84 @@ async def kick(ctx, user, motivo="Nessun motivo fornito."):
             required=True,
         ),
         interactions.Option(
-            name="motivo",
+            name="reason",
             description="Perchè stai bandendo questo utente?",
             type=interactions.OptionType.STRING,
             required=False,
         )
-    ]
+    ],
+    default_member_permissions=interactions.Permissions.BAN_MEMBERS
 )
-async def ban(ctx, user, motivo="Nessun motivo inserito."):
+async def ban(ctx, user, reason="Nessun reason inserito."):
     
     # Vars
     guild = await ctx.get_guild()
-    EmbedClient = Embeds.BanEmbed
-    Embed = Embeds.ServerBanEmbed
+    EmbedClient = copy(Embeds.BanEmbed)
+    Embed = copy(Embeds.ServerBanEmbed)
 
     # Embed Settings
     EmbedClient.add_field("👮 Moderatore: ", value=ctx.author.name)
-    EmbedClient.add_field("📒 Motivo: ", value=motivo)
+    EmbedClient.add_field("📒 Motivo: ", value=reason)
     Embed.add_field("👨 Utente: ", value=user.name, inline=False)
-    Embed.add_field("📒 Motivo: ", value=motivo, inline=False)
+    Embed.add_field("📒 Motivo: ", value=reason, inline=False)
 
     # Actions
     await ctx.send(embeds=Embed)
-    await user.send(embeds=EmbedClient)
-    await user.ban(guild.id, motivo)
+    await user.send(embeds=EmbedClient, ephemeral=True)
+    await user.ban(guild.id, reason)
 
+# Warn Command
+@Bot.command(
+    name="warn",
+    description="Avverti un utente.",
+    options=[
+        interactions.Option(
+            name="user",
+            description="Utente da avvertire.",
+            type=interactions.OptionType.USER,
+            required=True,
+        ),
+        interactions.Option(
+            name="reason",
+            description="Motivo dell'avvertimento.",
+            type=interactions.OptionType.STRING,
+            required=True,
+        )
+    ],
+    default_member_permissions=interactions.Permissions.KICK_MEMBERS
+)
+async def warn(ctx, user, reason):
+    
+    # Vars
+    UserData = await read_json_value(str(int(user.id)))
+    warn_amount = 0
+
+    # Embed Settings
+    WarnEmbed = copy(Embeds.WarnEmbed)
+    ServerWarnEmbed = copy(Embeds.ServerWarnEmbed)
+    WarnEmbed.add_field(name="👮 Moderatore: ", value=ctx.author.name, inline=False)
+    WarnEmbed.add_field(name="📒 Motivo: ", value=reason, inline=False)
+    ServerWarnEmbed.add_field(name="👨 Utente: ", value=user.name, inline=False)
+    ServerWarnEmbed.add_field(name="📒 Motivo: ", value=reason, inline=False)
+
+    # Actions
+    if UserData is None:
+        # Create and set data.
+        UserData = await build_user_data(str(int(user.id)))
+        UserData["warn_amount"] = "1"
+        warn_amount = UserData["warn_amount"]
+        await write_json_value(int(user.id), UserData)
+    else:
+        # Set data.
+        UserData["warn_amount"] = str(int(UserData["warn_amount"]) + 1)
+        warn_amount = UserData["warn_amount"]
+        await write_json_value(int(user.id), UserData)
+
+    # Set embed and send message.
+    ServerWarnEmbed.add_field(name="🛑 Numero di Warn Totali: ", value=str(warn_amount), inline=False)
+    WarnEmbed.add_field(name="🛑 Numero di Warn Totali: ", value=str(warn_amount), inline=False)
+    await user.send(embeds=WarnEmbed)
+    await ctx.send(embeds=ServerWarnEmbed, ephemeral=True)
+        
 
 Bot.start()
