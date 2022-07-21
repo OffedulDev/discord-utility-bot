@@ -39,6 +39,21 @@ class Embeds:
     BadRequest = interactions.Embed(title="🔐 Bad Request", description="La request inviata è stata rifiutata da Discord oppure i parametri sono invalidi.", color=colors.red)
     TimeoutEmbed = interactions.Embed(title="🤐 Sei stato messo in Timeout 🤐", description="Sei stato messo in timeout da un moderatore, durante questo periodo non puoi parlare o entrare nei canali vocali, seguano i dettagli.", color=colors.red)
     ServerTimeoutEmbed = interactions.Embed(title="✅ Utente messo in Timeout", description="Hai messo in timeout l'utente con successo, seguano i dettagli dell'azione.", color=colors.green)
+    ModificaApportata = interactions.Embed(title="✅ Modificato con Successo!", description="Seguano i dettagli della modifica che hai apportato.", color=colors.green)
+
+
+# Modal Utility
+Modals = {
+    "nuova_categoria": [
+        interactions.TextInput(
+            label="Nome della categoria da aggiungere.",
+            style=interactions.TextStyleType.SHORT,
+            custom_id="categoryName",
+            min_length=1,
+            max_length=80
+        )
+    ]
+}
 
 # HTTP Functions
 Base = "https://discord.com/api/v9/"
@@ -61,7 +76,10 @@ async def read_json_value(value):
         Data = json.loads(file.read())
         Data = Data["data"]
         file.close()
-        return Data[value]
+        try:
+            return Data[value]
+        except KeyError:
+            return None
         
 async def write_json_value(key, data):
     with open('data.json', "r+") as file:
@@ -256,5 +274,55 @@ async def timeout(ctx, user, time, reason="Nessun motivo inserito."):
         BadRequestEmbed.add_field("⚠️ Codice Risposta: ", value=str(Session.status_code), inline=False)
         await ctx.send(embeds=BadRequestEmbed, ephemeral=True)
 
+# Ticket System
+# Modals
+@Bot.modal("nuova_categoria")
+async def nuova_categoria(ctx, category_name):
+    
+    # Vars
+    categories = await read_json_value("categories")
+    embed = copy(Embeds.ModificaApportata)
+
+    # Embed Settings
+    embed.add_field("📒 Modifica: ", value="Nuova Categoria!", inline=False)
+
+    # Actions
+    categories.append(category_name)
+    await ctx.send(embeds=embed, ephemeral=True)
+    await write_json_value("categories", categories)
+
+# Ticket Setup Command
+@Bot.command(
+    name="ticket",
+    description="Imposta i vari parametri dei ticket.",
+    options=[
+        interactions.Option(
+            name="index",
+            description="Cosa vuoi editare?",
+            type=interactions.OptionType.STRING,
+            required=True
+        )
+    ],
+    default_member_permissions=interactions.Permissions.ADMINISTRATOR
+)
+async def ticket_setup(ctx, index):
+    
+    # Vars
+    BadRequestEmbed = copy(Embeds.BadRequest)
+
+    # Embed Settings
+    BadRequestEmbed.add_field(name="🛑 Motivo:", value="Nessuna impostazione trovata con la tua index.", inline=False)
+
+    # Actions
+    if index in Modals:
+        Modal = interactions.Modal(
+            title=f"Edit '{index}'",
+            custom_id=index,
+            components=Modals[index]
+        )
+
+        await ctx.popup(Modal)
+    else:
+        await ctx.send(embeds=BadRequestEmbed, ephemeral=True)
 
 Bot.start()
