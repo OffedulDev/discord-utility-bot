@@ -1,12 +1,6 @@
 from copy import copy
-from distutils.command.build import build
-from email.policy import default
-import json
-from pydoc import describe
-from unittest import addModuleCleanup
-from xmlrpc.client import Server
-from click import option
-import interactions
+import datetime, json, interactions, requests
+from Bot_TokenFile import token
 class colors:
     default = 0
     teal = 0x1abc9c
@@ -32,9 +26,9 @@ class colors:
     blurple = 0x7289da
     greyple = 0x99aab5
 
-Bot = interactions.Client(token="OTk3MTMyMTI0MDQ4MDY4Nzg4.GzHUcy.UHUZs4_5B8plaalx8j9Cp1t9ehwlSLWneOVz6U")
+Bot = interactions.Client(token=token)
 
-    
+# Embed Utility
 class Embeds:
     BanEmbed = interactions.Embed(title="🛑 Sei stato bannato. 🛑", description="Sei stato bandito da Diamond City, seguano i dettagi del tuo ban.", color=colors.red)
     ServerBanEmbed = interactions.Embed(title="✅ Utente Bannato", description="Hai bannato l'utente con successo, seguano i dettagli dell'azione.", color=colors.green)
@@ -42,6 +36,16 @@ class Embeds:
     ServerKickEmbed = interactions.Embed(title="✅ Utente Espulso", description="Hai espulso l'utente con successo, seguano i dettagli dell'azione.", color=colors.green)
     WarnEmbed = interactions.Embed(title="🪖 Sei stato avvertito! 🪖", description="Sei stato avvertito, seguano i dettagli del tuo avvertimento.", color=colors.orange)
     ServerWarnEmbed = interactions.Embed(title="✅ Utente Avvertito", description="Hai avvertito l'utente con successo, seguano i dettagli dell'azione.", color=colors.green)
+    BadRequest = interactions.Embed(title="🔐 Bad Request", description="La request inviata è stata rifiutata da Discord oppure i parametri sono invalidi.", color=colors.red)
+    TimeoutEmbed = interactions.Embed(title="🤐 Sei stato messo in Timeout 🤐", description="Sei stato messo in timeout da un moderatore, durante questo periodo non puoi parlare o entrare nei canali vocali, seguano i dettagli.", color=colors.red)
+    ServerTimeoutEmbed = interactions.Embed(title="✅ Utente messo in Timeout", description="Hai messo in timeout l'utente con successo, seguano i dettagli dell'azione.", color=colors.green)
+
+# HTTP Functions
+Base = "https://discord.com/api/v9/"
+Default_Headers = {"Authorization": f"Bot {token}"}
+async def prepare_api_request(endpoint):
+    Request_Url = Base + endpoint
+    return Request_Url
 
 # JSON Functions
 async def build_user_data(user_id):
@@ -198,5 +202,59 @@ async def warn(ctx, user, reason):
     await user.send(embeds=WarnEmbed)
     await ctx.send(embeds=ServerWarnEmbed, ephemeral=True)
         
+# Timeout Command
+@Bot.command(
+    name="timeout",
+    description="Metti un utente in timeout.",
+    options=[
+        interactions.Option(
+            name="user",
+            description="L'utente da mettere in timeout.",
+            type=interactions.OptionType.USER,
+            required=True
+        ),
+        interactions.Option(
+            name="time",
+            description="Tempo in minuti della durata del timeout.",
+            type=interactions.OptionType.INTEGER,
+            required=True
+        ),
+        interactions.Option(
+            name="reason",
+            description="Motivo dell'timeout.",
+            type=interactions.OptionType.STRING,
+            required=False
+        )
+    ],
+    default_member_permissions=interactions.Permissions.KICK_MEMBERS
+)
+async def timeout(ctx, user, time, reason="Nessun motivo inserito."):
+
+    # Vars
+    Guild = await ctx.get_guild()
+    GuildID = int(Guild.id)
+    Endpoint = f"guilds/{GuildID}/members/{int(user.id)}"
+    Url = await prepare_api_request(Endpoint)
+    time =  (datetime.datetime.utcnow() + datetime.timedelta(minutes=time)).isoformat()
+    Json = {'communication_disabled_until': time}
+
+    # Embed Settings
+    TimeoutEmbed = copy(Embeds.TimeoutEmbed)
+    ServerTimeoutEmbed = copy(Embeds.ServerTimeoutEmbed)
+    BadRequestEmbed = copy(Embeds.BadRequest)
+    TimeoutEmbed.add_field("👮 Moderatore:", value=ctx.author.name, inline=True)
+    TimeoutEmbed.add_field("📒 Motivo:", value=reason, inline=False)
+    ServerTimeoutEmbed.add_field("👨 Utente:", value=user.name, inline=True)
+    ServerTimeoutEmbed.add_field("📒 Motivo:", value=reason, inline=False)
+
+    # Actions
+    Session = requests.patch(Url, json=Json, headers=Default_Headers)
+    if Session.status_code in range(200, 299):
+        await user.send(embeds=TimeoutEmbed)
+        await ctx.send(embeds=ServerTimeoutEmbed, ephemeral=True)
+    else:
+        BadRequestEmbed.add_field("⚠️ Codice Risposta: ", value=str(Session.status_code), inline=False)
+        await ctx.send(embeds=BadRequestEmbed, ephemeral=True)
+
 
 Bot.start()
