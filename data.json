@@ -1,11 +1,10 @@
 {
     "data": {
-        "categories": [
-            "Supporto Live",
-            "Supporto Computer",
-            "Enorme Aiuto"
-        ],
-        "channelId": "997129892795785268",
-        "messageContent": "Questa \u00e8 una prova."
+        "categories": [],
+        "channelId": "",
+        "messageContent": "",
+        "834529069814644777": {
+            "warn_amount": "3"
+        }
     }
 }

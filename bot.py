@@ -112,7 +112,7 @@ async def read_json_value(value):
             return Data[value]
         except KeyError:
             return None
-        
+
 async def write_json_value(key, data):
     with open('data.json', "r+") as file:
         Data = json.loads(file.read())
@@ -195,8 +195,8 @@ async def ban(ctx, user, reason="Nessun reason inserito."):
     Embed.add_field("📒 Motivo: ", value=reason, inline=False)
 
     # Actions
-    await ctx.send(embeds=Embed)
-    await user.send(embeds=EmbedClient, ephemeral=True)
+    await ctx.send(embeds=Embed, ephemeral=True)
+    await user.send(embeds=EmbedClient)
     await user.ban(guild.id, reason)
 
 # Warn Command
@@ -242,9 +242,14 @@ async def warn(ctx, user, reason):
         await write_json_value(int(user.id), UserData)
     else:
         # Set data.
-        UserData["warn_amount"] = str(int(UserData["warn_amount"]) + 1)
+        NewAmount = int(UserData["warn_amount"]) + 1
+        if NewAmount > 3:
+            await ban(ctx, user, reason="Numero di warn massimi raggiunto!")
+            return
+
+        UserData["warn_amount"] = str(NewAmount)
         warn_amount = UserData["warn_amount"]
-        await write_json_value(int(user.id), UserData)
+        await write_json_value(str(int(user.id)), UserData)
 
     # Set embed and send message.
     ServerWarnEmbed.add_field(name="🛑 Numero di Warn Totali: ", value=str(warn_amount), inline=False)
