@@ -245,6 +245,9 @@ async def warn(ctx, user, reason):
         NewAmount = int(UserData["warn_amount"]) + 1
         if NewAmount > 3:
             await ban(ctx, user, reason="Numero di warn massimi raggiunto!")
+            UserData["warn_amount"] = "0"
+            await write_json_value(str(int(user.id)), UserData)
+            
             return
 
         UserData["warn_amount"] = str(NewAmount)
