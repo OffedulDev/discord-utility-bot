@@ -41,7 +41,6 @@ class Embeds:
     ServerTimeoutEmbed = interactions.Embed(title="✅ Utente messo in Timeout", description="Hai messo in timeout l'utente con successo, seguano i dettagli dell'azione.", color=colors.green)
     ModificaApportata = interactions.Embed(title="✅ Modificato con Successo!", description="Seguano i dettagli della modifica che hai apportato.", color=colors.green)
 
-
 # Modal Utility
 Modals = {
     "nuova_categoria": [
