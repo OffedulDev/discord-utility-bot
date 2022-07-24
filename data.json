@@ -1,7 +1,11 @@
 {
     "data": {
         "categories": [
-            "ciao"
-        ]
+            "Supporto Live",
+            "Supporto Computer",
+            "Enorme Aiuto"
+        ],
+        "channelId": "997129892795785268",
+        "messageContent": "Questa \u00e8 una prova."
     }
 }

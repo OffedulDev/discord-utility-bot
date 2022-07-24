@@ -1,5 +1,8 @@
 from copy import copy
-import datetime, json, interactions, requests
+import datetime
+import json
+import interactions
+import requests
 from Bot_TokenFile import token
 class colors:
     default = 0
@@ -40,6 +43,18 @@ class Embeds:
     TimeoutEmbed = interactions.Embed(title="🤐 Sei stato messo in Timeout 🤐", description="Sei stato messo in timeout da un moderatore, durante questo periodo non puoi parlare o entrare nei canali vocali, seguano i dettagli.", color=colors.red)
     ServerTimeoutEmbed = interactions.Embed(title="✅ Utente messo in Timeout", description="Hai messo in timeout l'utente con successo, seguano i dettagli dell'azione.", color=colors.green)
     ModificaApportata = interactions.Embed(title="✅ Modificato con Successo!", description="Seguano i dettagli della modifica che hai apportato.", color=colors.green)
+    TicketEmbed = interactions.Embed(title="🔧 Ticket 🗝️", description="Seleziona un opzione qui sotto per aprire un ticket nella rispettiva categoria, segue un messaggio personalizzato.", color=colors.teal)
+    OpenTicketEmbed = interactions.Embed(title="👮 Ticket Aperto con Successo 🎭", description="Il tuo ticket è stato aperto e posizionato nella categoria da te richiesta. A breve un membro dello staff sarà da te per assisterti e risolvere o chiarire i tuoi dubbi.", color=colors.green)
+
+# Functions Utility
+
+async def get_channel(id: int):
+        try:
+            return interactions.Channel(**await Bot._http.get_channel(id), _client=Bot._http)
+        except:
+            print("Error getting channel")
+            return None
+
 
 # Modal Utility
 Modals = {
@@ -50,6 +65,24 @@ Modals = {
             custom_id="categoryName",
             min_length=1,
             max_length=80
+        )
+    ],
+    "channel": [
+        interactions.TextInput(
+            label="ID del canale per il messaggio.",
+            style=interactions.TextStyleType.SHORT,
+            custom_id="channelID",
+            min_length=1,
+            max_length=19
+        )
+    ],
+    "message": [
+        interactions.TextInput(
+            label="Messaggio personalizzato.",
+            style=interactions.TextStyleType.SHORT,
+            custom_id="messageContent",
+            min_length=1,
+            max_length=19
         )
     ]
 }
@@ -290,6 +323,43 @@ async def nuova_categoria(ctx, category_name):
     await ctx.send(embeds=embed, ephemeral=True)
     await write_json_value("categories", categories)
 
+@Bot.modal("channel")
+async def set_channel(ctx, channelID):
+    
+    BadRequest = copy(Embeds.BadRequest)
+    CompletedEdit = copy(Embeds.ModificaApportata)
+
+    try:
+        int(channelID)
+    except ValueError:
+        BadRequest.add_field("📒 Motivo: ", value="Inserisci un numero di 18 cifre!", inline=False)
+        
+        await ctx.send(embeds=BadRequest, ephemeral=True)
+        return
+
+    ChannelID = int(channelID)
+    Channel = await get_channel(ChannelID)
+    if Channel is None:
+        BadRequest.add_field("📒 Motivo: ", value="Il canale non esiste!", inline=False)
+        
+        await ctx.send(embeds=BadRequest, ephemeral=True)
+        return
+
+    CompletedEdit.add_field("📒 Modifica: ", value="Canale di invio impostato. (" + Channel.name + ")", inline=False)
+    
+    await write_json_value("channelId", str(int(Channel.id)))
+    await ctx.send(embeds=CompletedEdit, ephemeral=True)
+
+
+@Bot.modal("message")
+async def set_message(ctx, messageContent):
+
+    CompletedEdit = copy(Embeds.ModificaApportata)
+    CompletedEdit.add_field("📒 Modifica: ", value="Messaggio di invio impostato. (" + messageContent + ")", inline=False)
+    
+    await write_json_value("messageContent", str(messageContent))
+    await ctx.send(embeds=CompletedEdit, ephemeral=True)
+
 # Ticket Setup Command
 @Bot.command(
     name="ticket",
@@ -323,5 +393,77 @@ async def ticket_setup(ctx, index):
         await ctx.popup(Modal)
     else:
         await ctx.send(embeds=BadRequestEmbed, ephemeral=True)
+
+@Bot.component("ticketComponent")
+async def openTicket(ctx, category):
+
+    category = category[0]
+
+    # Vars
+    Guild = await ctx.get_guild()
+    TicketOpened = copy(Embeds.OpenTicketEmbed)
+    CloseButton = interactions.Button(
+        style=interactions.ButtonStyle.DANGER,
+        label="⚠️ Chiudi il Ticket",
+        custom_id=ctx.author.name
+    )
+
+    # Embed Settings
+    TicketOpened.add_field(name="📒 Categoria: ", value=category, inline=False)
+
+    # Actions
+    Channel = await Guild.create_channel(name=f"{category.lower()}-{ctx.author.name.lower()}", type=interactions.ChannelType.GUILD_TEXT, topic=f"Ticket creato da {ctx.author.name} in {category}")
+    @Bot.component(ctx.author.name)
+    async def close(context):
+        await Channel.delete()
+
+    await Channel.send(ctx.author.mention)
+    await Channel.send(embeds=TicketOpened, components=CloseButton)
+
+
+
+@Bot.command(
+    name="inviamessaggioticket",
+    description="Invia il messaggio per permettere agli utenti di aprire un ticket.",
+    default_member_permissions=interactions.Permissions.ADMINISTRATOR
+)
+async def inviaMessaggioTicket(ctx):
+    
+    # Vars
+    BadRequestEmbed = copy(Embeds.BadRequest)
+    TicketEmbed = copy(Embeds.TicketEmbed)
+
+    # Actions
+    Options = await read_json_value("categories")
+    MessageContent = await read_json_value("messageContent")
+    ChannelID = await read_json_value("channelId")
+    if (Options == "" or None) or (MessageContent == "" or None) or (ChannelID == "" or None):
+        BadRequestEmbed.add_field("📒 Motivo: ", value="Errore data interno o i parametri non sono stati impostati", inline=False)
+
+        await ctx.send(embeds=BadRequestEmbed, ephemeral=True)
+        return
+
+    _Options = []
+    for Option in Options:
+        _Options.append(interactions.SelectOption(
+                label=Option,
+                value=Option,
+                description="Apri un ticket in questa categoria."
+            )
+        )
+    
+    Menu = interactions.SelectMenu(
+        options=_Options,
+        placeholder="Seleziona una categoria per cominciare.",
+        custom_id="ticketComponent"
+    )
+
+    TicketEmbed.add_field(name="🎭 Messaggio Personalizzato: ", value=MessageContent, inline=False)
+    
+    Channel = await get_channel(int(ChannelID))
+
+    await Channel.send(embeds=TicketEmbed, components=Menu)
+    await ctx.send("Punto di apertura ticket inviato con successo.")
+    return
 
 Bot.start()
