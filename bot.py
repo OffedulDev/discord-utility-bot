@@ -33,9 +33,9 @@ Bot = interactions.Client(token=token)
 
 # Embed Utility
 class Embeds:
-    BanEmbed = interactions.Embed(title="🛑 Sei stato bannato. 🛑", description="Sei stato bandito da Diamond City, seguano i dettagi del tuo ban.", color=colors.red)
+    BanEmbed = interactions.Embed(title="🛑 Sei stato bannato. 🛑", description="Sei stato bandito, seguano i dettagi del tuo ban.", color=colors.red)
     ServerBanEmbed = interactions.Embed(title="✅ Utente Bannato", description="Hai bannato l'utente con successo, seguano i dettagli dell'azione.", color=colors.green)
-    KickEmbed = interactions.Embed(title="⚠️ Sei stato Espulso. ⚠️", description="Sei stato espulso da Diamond City, seguano i dettagi del tuo ban.", color=colors.red)
+    KickEmbed = interactions.Embed(title="⚠️ Sei stato Espulso. ⚠️", description="Sei stato espulso, seguano i dettagi del tuo ban.", color=colors.red)
     ServerKickEmbed = interactions.Embed(title="✅ Utente Espulso", description="Hai espulso l'utente con successo, seguano i dettagli dell'azione.", color=colors.green)
     WarnEmbed = interactions.Embed(title="🪖 Sei stato avvertito! 🪖", description="Sei stato avvertito, seguano i dettagli del tuo avvertimento.", color=colors.orange)
     ServerWarnEmbed = interactions.Embed(title="✅ Utente Avvertito", description="Hai avvertito l'utente con successo, seguano i dettagli dell'azione.", color=colors.green)
